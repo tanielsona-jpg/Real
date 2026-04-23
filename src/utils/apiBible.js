@@ -4,7 +4,7 @@
 // Versões suportadas: NVI, NVT (buscadas dinamicamente por nome na API)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const API_KEY = 'q3d75t6SITE5gIxDJr2_C';
+const API_KEY = process.env.REACT_APP_BIBLE_API_KEY;
 const BASE    = 'https://api.scripture.api.bible/v1';
 
 // ── Mapeamento: nome português do livro → código OSIS (usado pela API) ────────

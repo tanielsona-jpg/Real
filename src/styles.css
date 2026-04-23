@@ -1391,6 +1391,135 @@ body {
   color: #e88099;
 }
 
+/* ── Ações do versículo (favorito + KJV) ────────────────────────────────── */
+.verse-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-favorito {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: transform 0.15s;
+  color: var(--text-muted);
+}
+.btn-favorito:hover { transform: scale(1.2); }
+.btn-favorito--ativo { color: #e5a800; }
+
+/* ── Favoritos ───────────────────────────────────────────────────────────── */
+.favoritos-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 64px 24px;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 15px;
+}
+.favoritos-empty__icon { font-size: 40px; }
+
+.favoritos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.favorito-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+  box-shadow: var(--shadow-xs);
+  width: 100%;
+}
+.favorito-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.favorito-card__ref {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.favorito-card__texto {
+  font-family: var(--font-text);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Plano de estudo ─────────────────────────────────────────────────────── */
+.study-plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.study-plan-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--sand-1, #f9f6f2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, border-color 0.15s;
+  width: 100%;
+}
+.study-plan-item:hover { background: var(--sand-2, #f0ebe3); }
+.study-plan-item--ativo {
+  border-color: var(--accent);
+  background: rgba(139, 26, 46, 0.06);
+  font-weight: 600;
+}
+.study-plan-item__nome { flex: 1; }
+.study-plan-item__badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  background: rgba(139, 26, 46, 0.1);
+  border-radius: 20px;
+  padding: 2px 8px;
+}
+
+.app.dark .study-plan-item {
+  background: rgba(255,255,255,0.04);
+}
+.app.dark .study-plan-item:hover {
+  background: rgba(255,255,255,0.08);
+}
+.app.dark .study-plan-item--ativo {
+  background: rgba(139, 26, 46, 0.12);
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (min-width: 600px) {
   .chapter-grid { grid-template-columns: repeat(7, 1fr); }

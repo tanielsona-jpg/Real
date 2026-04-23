@@ -1,56 +1,43 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import "./styles.css";
-import ra from "./data/almeida_ra.json";
-import rc from "./data/almeida_rc.json";
 
 // Firebase
 import { auth, googleProvider } from "./firebase";
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { signInWithPopup, signOut } from "firebase/auth";
 
 // Componentes
-import Onboarding    from "./components/Onboarding";
-import Anotacoes     from "./components/Anotacoes";
-import CanelaDeFogo  from "./components/CanelaDeFogo";
+import Onboarding   from "./components/Onboarding";
+import Anotacoes    from "./components/Anotacoes";
+import CanelaDeFogo from "./components/CanelaDeFogo";
+import Favoritos    from "./components/Favoritos";
 
-// API.Bible
-import { fetchApiChapter } from "./utils/apiBible";
+// Hooks
+import { useAuth }         from "./hooks/useAuth";
+import { useBible }        from "./hooks/useBible";
+import { useStudy }        from "./hooks/useStudy";
+import { useOriginalText } from "./hooks/useOriginalText";
+import { useFavoritos }    from "./hooks/useFavoritos";
+
 // ─────────────────────────────────────────────────────────────────
-const STUDY_BOOK       = "Daniel";
-const THEME_KEY        = "fa_theme";
-const TAB_KEY          = "fa_tab";
-const STUDY_CHAPTER_KEY = "fa_study_chapter";
-const ONBOARDING_KEY   = "fa_onboarding_done";
-
-const VERSIONS = [
-  { id: 'ARA', label: 'ARA', local: true },
-  { id: 'ARC', label: 'ARC', local: true },
-  { id: 'NVT', label: 'NVT', local: false },
-  { id: 'NVI', label: 'NVI', local: false },
-];
+const THEME_KEY      = "fa_theme";
+const TAB_KEY        = "fa_tab";
+const ONBOARDING_KEY = "fa_onboarding_done";
 
 const TABS = [
-  { id: "home",  emoji: "🏠", label: "Início"  },
-  { id: "bible", emoji: "📖", label: "Bíblia"  },
-  { id: "study", emoji: "✝️",  label: "Estudo"  },
-  { id: "you",   emoji: "👤", label: "Você"    },
+  { id: "home",      emoji: "🏠", label: "Início"    },
+  { id: "bible",     emoji: "📖", label: "Bíblia"    },
+  { id: "study",     emoji: "✝️",  label: "Estudo"    },
+  { id: "favoritos", emoji: "⭐", label: "Salvos"    },
+  { id: "you",       emoji: "👤", label: "Você"      },
 ];
 
 export default function App() {
 
   // ── Auth & onboarding ────────────────────────────────────────────
-  const [user, setUser]           = useState(null);
-  const [authReady, setAuthReady] = useState(false);
+  const { user, authReady } = useAuth();
   const [onboardingDone, setOnboardingDone] = useState(
     !!localStorage.getItem(ONBOARDING_KEY)
   );
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      setAuthReady(true);
-    });
-    return unsub;
-  }, []);
 
   function handleOnboardingComplete() {
     localStorage.setItem(ONBOARDING_KEY, "1");
@@ -66,114 +53,36 @@ export default function App() {
   );
   const [selectedBook, setSelectedBook]       = useState(null);
   const [selectedChapter, setSelectedChapter] = useState(null);
-  const [openOriginal, setOpenOriginal]       = useState({});
-  const [originalText, setOriginalText]       = useState({});
-  const [loadingOriginal, setLoadingOriginal] = useState({});
 
-  // ── Seletor de versão ────────────────────────────────────────────
-  const [selectedVersion, setSelectedVersion] = useState('ARA');
-  const [apiVersesCache, setApiVersesCache]   = useState({});
-  const [apiLoading, setApiLoading]           = useState(false);
-  const [apiError, setApiError]               = useState(null);
-
-  const [lastStudyChapter, setLastStudyChapter] = useState(
-    Number(localStorage.getItem(STUDY_CHAPTER_KEY)) || 1
-  );
-
-  // ── Persist state ────────────────────────────────────────────────
   useEffect(() => { localStorage.setItem(THEME_KEY, theme); }, [theme]);
   useEffect(() => { localStorage.setItem(TAB_KEY, activeTab); }, [activeTab]);
-  useEffect(() => {
-    localStorage.setItem(STUDY_CHAPTER_KEY, String(lastStudyChapter));
-  }, [lastStudyChapter]);
 
-  // ── Bible data ───────────────────────────────────────────────────
-  const books = useMemo(() => (
-    [...new Set(ra.verses.map((v) => v.book_name))]
-  ), []);
+  // ── Dados bíblicos ───────────────────────────────────────────────
+  const {
+    books, chapters, currentVerses, textoCapitulo,
+    verseOfDay, selectedVersion, changeVersion,
+    isApiVersion, apiLoading, apiError, VERSIONS,
+  } = useBible(selectedBook, selectedChapter);
 
-  const chapters = useMemo(() => {
-    if (!selectedBook) return [];
-    return [...new Set(
-      ra.verses
-        .filter((v) => v.book_name === selectedBook)
-        .map((v) => Number(v.chapter))
-    )].sort((a, b) => a - b);
-  }, [selectedBook]);
-
-  const versesRA = useMemo(() => {
-    if (!selectedBook || !selectedChapter) return [];
-    return ra.verses.filter(
-      (v) =>
-        v.book_name === selectedBook &&
-        Number(v.chapter) === Number(selectedChapter)
-    );
-  }, [selectedBook, selectedChapter]);
-
-  const versesCompared = useMemo(() => (
-    versesRA.map((verseRA) => {
-      const verseRC = rc.verses.find(
-        (v) =>
-          v.book_name === verseRA.book_name &&
-          Number(v.chapter) === Number(verseRA.chapter) &&
-          Number(v.verse) === Number(verseRA.verse)
-      );
-      return { verse: Number(verseRA.verse), ra: verseRA.text, rc: verseRC?.text || "" };
-    })
-  ), [versesRA]);
-
-  // Versículos locais normalizados para a versão selecionada
-  const localVerses = useMemo(() => {
-    if (selectedVersion === 'ARC')
-      return versesCompared.map(v => ({ verse: v.verse, text: v.rc }));
-    // ARA (padrão)
-    return versesCompared.map(v => ({ verse: v.verse, text: v.ra }));
-  }, [versesCompared, selectedVersion]);
-
-  // Versículos da versão em uso (local ou API)
-  const isApiVersion = ['NVI', 'NVT'].includes(selectedVersion);
-  const apiCacheKey  = `${selectedVersion}-${selectedBook}-${selectedChapter}`;
-  const currentVerses = isApiVersion
-    ? (apiVersesCache[apiCacheKey] ?? [])
-    : localVerses;
-
-  // Fetch da API quando necessário
-  useEffect(() => {
-    if (!selectedBook || !selectedChapter) return;
-    if (!isApiVersion) return;
-    if (apiVersesCache[apiCacheKey]) return; // já em cache
-
-    setApiLoading(true);
-    setApiError(null);
-
-    fetchApiChapter(selectedVersion, selectedBook, selectedChapter)
-      .then(verses => {
-        setApiVersesCache(prev => ({ ...prev, [apiCacheKey]: verses }));
-      })
-      .catch(err => setApiError(err.message))
-      .finally(() => setApiLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedVersion, selectedBook, selectedChapter]);
-
-  // Texto plano do capítulo para a IA (usa a versão ativa)
-  const textoCapitulo = useMemo(() => (
-    currentVerses.map(v => `${v.verse}. ${v.text}`).join(' ')
-  ), [currentVerses]);
+  // ── Estudo ───────────────────────────────────────────────────────
+  const {
+    studyBook, lastStudyChapter, setLastStudyChapter,
+    changeStudyBook, STUDY_PLAN,
+  } = useStudy();
 
   useEffect(() => {
-    if (selectedBook === STUDY_BOOK && selectedChapter) {
+    if (selectedBook === studyBook && selectedChapter) {
       setLastStudyChapter(Number(selectedChapter));
     }
-  }, [selectedBook, selectedChapter]);
+  }, [selectedBook, selectedChapter, studyBook, setLastStudyChapter]);
 
-  // Versículo do dia
-  const verseOfDay = useMemo(() => {
-    const dayIndex = new Date().getDate();
-    const index = (dayIndex * 37) % ra.verses.length;
-    return ra.verses[index];
-  }, []);
+  // ── Texto original (KJV) ─────────────────────────────────────────
+  const { toggleOriginal, openOriginal, originalText, loadingOriginal } = useOriginalText();
 
-  // ── Navigation ───────────────────────────────────────────────────
+  // ── Favoritos ────────────────────────────────────────────────────
+  const { favoritos, isFavorito, toggleFavorito } = useFavoritos();
+
+  // ── Navegação ────────────────────────────────────────────────────
   function goToBibleHome() {
     setSelectedBook(null);
     setSelectedChapter(null);
@@ -189,7 +98,7 @@ export default function App() {
     setSelectedChapter(Number(chapterNumber));
     setActiveTab("bible");
   }
-  function continueStudy() { openChapter(STUDY_BOOK, lastStudyChapter); }
+  function continueStudy() { openChapter(studyBook, lastStudyChapter); }
 
   function previousChapter() {
     const idx = chapters.indexOf(Number(selectedChapter));
@@ -200,39 +109,10 @@ export default function App() {
     if (idx >= 0 && idx < chapters.length - 1) setSelectedChapter(chapters[idx + 1]);
   }
 
-  // ── Toggle KJV original ──────────────────────────────────────────
-  async function toggleOriginal(book, chapter, verse) {
-    const key = `${book}-${chapter}-${verse}`;
-    if (openOriginal[key]) {
-      setOpenOriginal((prev) => ({ ...prev, [key]: false }));
-      return;
-    }
-    if (originalText[key]) {
-      setOpenOriginal((prev) => ({ ...prev, [key]: true }));
-      return;
-    }
-    try {
-      setLoadingOriginal((prev) => ({ ...prev, [key]: true }));
-      const response = await fetch(
-        `https://bible-api.com/${encodeURIComponent(`${book} ${chapter}:${verse}`)}`
-      );
-      const data = await response.json();
-      const text = data?.text?.trim() || "Não foi possível carregar agora.";
-      setOriginalText((prev) => ({ ...prev, [key]: text }));
-      setOpenOriginal((prev) => ({ ...prev, [key]: true }));
-    } catch {
-      setOriginalText((prev) => ({ ...prev, [key]: "Erro ao carregar o texto online." }));
-      setOpenOriginal((prev) => ({ ...prev, [key]: true }));
-    } finally {
-      setLoadingOriginal((prev) => ({ ...prev, [key]: false }));
-    }
-  }
-
   // ════════════════════════════════════════════════════════════════
   // RENDER FUNCTIONS
   // ════════════════════════════════════════════════════════════════
 
-  // ── Home ─────────────────────────────────────────────────────────
   function renderHome() {
     const nome = localStorage.getItem("fa_nome") || "";
     return (
@@ -243,7 +123,6 @@ export default function App() {
           <p className="screen-sub">Leitura diária e continuidade da caminhada.</p>
         </div>
 
-        {/* Versículo do dia */}
         <div className="card card--verse">
           <div className="card__eyebrow card__eyebrow--accent">✦ Versículo do dia</div>
           <div className="card__reference">
@@ -252,13 +131,12 @@ export default function App() {
           <p className="card__verse-text">{verseOfDay.text}</p>
         </div>
 
-        {/* Estudo */}
         <div className="card card--study">
           <div className="card__eyebrow card__eyebrow--green">📖 Estudo Família Azevedo</div>
           <div className="card__meta-row">
             <span className="card__meta-item">
               <span className="card__meta-label">Livro</span>
-              <span className="card__meta-value">{STUDY_BOOK}</span>
+              <span className="card__meta-value">{studyBook}</span>
             </span>
             <span className="card__meta-sep" />
             <span className="card__meta-item">
@@ -274,7 +152,6 @@ export default function App() {
     );
   }
 
-  // ── Bible ────────────────────────────────────────────────────────
   function renderBible() {
     if (!selectedBook) return (
       <div className="screen">
@@ -315,8 +192,8 @@ export default function App() {
     );
 
     const currentIndex = chapters.indexOf(Number(selectedChapter));
-    const isFirst = currentIndex <= 0;
-    const isLast  = currentIndex === chapters.length - 1;
+    const isFirst      = currentIndex <= 0;
+    const isLast       = currentIndex === chapters.length - 1;
 
     return (
       <div className="screen reading-screen">
@@ -332,50 +209,55 @@ export default function App() {
           <button className="nav-arrow" onClick={nextChapter} disabled={isLast} aria-label="Próximo capítulo">›</button>
         </div>
 
-        {/* Seletor de versão */}
         <div className="version-selector">
-          {VERSIONS.map(v => (
+          {VERSIONS.map((v) => (
             <button
               key={v.id}
-              className={`version-tab${selectedVersion === v.id ? ' version-tab--active' : ''}`}
-              onClick={() => { setSelectedVersion(v.id); setApiError(null); }}
+              className={`version-tab${selectedVersion === v.id ? " version-tab--active" : ""}`}
+              onClick={() => changeVersion(v.id)}
             >
               {v.label}
             </button>
           ))}
         </div>
 
-        {/* Estado de carregamento da API */}
         {apiLoading && (
           <div className="version-loading">
-            <div className="canela-loading" style={{ background: 'transparent' }}>
+            <div className="canela-loading" style={{ background: "transparent" }}>
               <span /><span /><span />
             </div>
             <p>Carregando {selectedVersion}…</p>
           </div>
         )}
 
-        {/* Erro da API */}
         {apiError && !apiLoading && (
           <div className="version-error">
             <p>⚠ {apiError}</p>
           </div>
         )}
 
-        {/* Versículos */}
         {!apiLoading && !apiError && (
           <div className="verses-wrap">
             {currentVerses.map((v) => {
               const key = `${selectedBook}-${selectedChapter}-${v.verse}`;
+              const fav = isFavorito(selectedBook, selectedChapter, v.verse);
               return (
                 <div key={key} className="verse-block">
                   <div className="verse-block__number"><span>{v.verse}</span></div>
                   <div className="verse-block__body">
                     <p className="verse-text">{v.text}</p>
 
-                    {/* Botão KJV apenas para versões locais */}
-                    {!isApiVersion && (
-                      <>
+                    <div className="verse-actions">
+                      <button
+                        className={`btn-favorito${fav ? " btn-favorito--ativo" : ""}`}
+                        onClick={() => toggleFavorito(selectedBook, selectedChapter, v.verse, v.text)}
+                        aria-label={fav ? "Remover dos favoritos" : "Salvar versículo"}
+                        title={fav ? "Remover dos salvos" : "Salvar versículo"}
+                      >
+                        {fav ? "⭐" : "☆"}
+                      </button>
+
+                      {!isApiVersion && (
                         <button
                           className="btn btn--ghost btn--sm"
                           onClick={() => toggleOriginal(selectedBook, selectedChapter, v.verse)}
@@ -386,13 +268,14 @@ export default function App() {
                             ? "▲ Ocultar KJV"
                             : "🌐 Ver KJV"}
                         </button>
-                        {openOriginal[key] && !loadingOriginal[key] && (
-                          <div className="original-block">
-                            <span className="version-badge version-badge--kjv">KJV</span>
-                            <p className="original-text">{originalText[key]}</p>
-                          </div>
-                        )}
-                      </>
+                      )}
+                    </div>
+
+                    {!isApiVersion && openOriginal[key] && !loadingOriginal[key] && (
+                      <div className="original-block">
+                        <span className="version-badge version-badge--kjv">KJV</span>
+                        <p className="original-text">{originalText[key]}</p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -401,12 +284,10 @@ export default function App() {
           </div>
         )}
 
-        {/* ── Anotações + IA (apenas quando capítulo selecionado) ── */}
         <div className="reading-extras">
           <Anotacoes livro={selectedBook} capitulo={selectedChapter} />
         </div>
 
-        {/* FAB da Canela de Fogo */}
         <CanelaDeFogo
           livro={selectedBook}
           capitulo={selectedChapter}
@@ -416,7 +297,6 @@ export default function App() {
     );
   }
 
-  // ── Study ────────────────────────────────────────────────────────
   function renderStudy() {
     return (
       <div className="screen">
@@ -424,12 +304,13 @@ export default function App() {
           <h2 className="screen-title">Estudo Família Azevedo</h2>
           <p className="screen-sub">Acompanhe o progresso da família.</p>
         </div>
+
         <div className="card card--study">
           <div className="card__eyebrow card__eyebrow--green">✦ Progresso atual</div>
           <div className="card__meta-row">
             <span className="card__meta-item">
               <span className="card__meta-label">Livro</span>
-              <span className="card__meta-value">{STUDY_BOOK}</span>
+              <span className="card__meta-value">{studyBook}</span>
             </span>
             <span className="card__meta-sep" />
             <span className="card__meta-item">
@@ -441,16 +322,33 @@ export default function App() {
             <button className="btn btn--primary" onClick={continueStudy}>
               Continuar estudo →
             </button>
-            <button className="btn btn--secondary" onClick={() => openBook(STUDY_BOOK)}>
+            <button className="btn btn--secondary" onClick={() => openBook(studyBook)}>
               Ver todos os capítulos
             </button>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card__eyebrow">📋 Plano de leitura</div>
+          <div className="study-plan-list">
+            {STUDY_PLAN.map((book) => (
+              <button
+                key={book}
+                className={`study-plan-item${book === studyBook ? " study-plan-item--ativo" : ""}`}
+                onClick={() => changeStudyBook(book)}
+              >
+                <span className="study-plan-item__nome">{book}</span>
+                {book === studyBook && (
+                  <span className="study-plan-item__badge">Atual</span>
+                )}
+              </button>
+            ))}
           </div>
         </div>
       </div>
     );
   }
 
-  // ── You ──────────────────────────────────────────────────────────
   function renderYou() {
     const nome = localStorage.getItem("fa_nome") || "—";
 
@@ -469,7 +367,6 @@ export default function App() {
           <p className="screen-sub">Suas preferências e progresso.</p>
         </div>
 
-        {/* Perfil */}
         <div className="card">
           <div className="card__eyebrow">✦ Perfil</div>
           {user ? (
@@ -513,12 +410,11 @@ export default function App() {
           )}
         </div>
 
-        {/* Stats */}
         <div className="profile-cards">
           <div className="profile-card">
             <span className="profile-card__icon">📚</span>
             <span className="profile-card__label">Livro de estudo</span>
-            <span className="profile-card__value">{STUDY_BOOK}</span>
+            <span className="profile-card__value">{studyBook}</span>
           </div>
           <div className="profile-card">
             <span className="profile-card__icon">🔖</span>
@@ -529,6 +425,11 @@ export default function App() {
             <span className="profile-card__icon">{theme === "dark" ? "🌙" : "☀️"}</span>
             <span className="profile-card__label">Tema</span>
             <span className="profile-card__value">{theme === "dark" ? "Escuro" : "Claro"}</span>
+          </div>
+          <div className="profile-card">
+            <span className="profile-card__icon">⭐</span>
+            <span className="profile-card__label">Versículos salvos</span>
+            <span className="profile-card__value">{favoritos.length}</span>
           </div>
           <div className="profile-card">
             <span className="profile-card__icon">☁️</span>
@@ -544,7 +445,6 @@ export default function App() {
   // ROOT RENDER
   // ════════════════════════════════════════════════════════════════
 
-  // Aguarda Firebase inicializar antes de mostrar qualquer coisa
   if (!authReady) return (
     <div className="app-loading">
       <span className="app-loading-icon">✝</span>
@@ -552,7 +452,6 @@ export default function App() {
     </div>
   );
 
-  // Onboarding na primeira visita
   if (!onboardingDone) return (
     <Onboarding onComplete={handleOnboardingComplete} />
   );
@@ -577,10 +476,11 @@ export default function App() {
       </header>
 
       <main className="content">
-        {activeTab === "home"  && renderHome()}
-        {activeTab === "bible" && renderBible()}
-        {activeTab === "study" && renderStudy()}
-        {activeTab === "you"   && renderYou()}
+        {activeTab === "home"      && renderHome()}
+        {activeTab === "bible"     && renderBible()}
+        {activeTab === "study"     && renderStudy()}
+        {activeTab === "favoritos" && <Favoritos favoritos={favoritos} onOpenVerse={openChapter} />}
+        {activeTab === "you"       && renderYou()}
       </main>
 
       <nav className="bottom-nav">
