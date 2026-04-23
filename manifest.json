@@ -1,0 +1,22 @@
+{
+  "short_name": "Bíblia FA",
+  "name": "Bíblia — Família Azevedo",
+  "icons": [
+    {
+      "src": "icon-192.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#8b1a2e",
+  "background_color": "#f5ede0"
+}
