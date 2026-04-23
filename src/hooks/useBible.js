@@ -86,8 +86,7 @@ export function useBible(selectedBook, selectedChapter) {
       })
       .catch((err) => setApiError(err.message))
       .finally(() => setApiLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedVersion, selectedBook, selectedChapter]);
+  }, [selectedVersion, selectedBook, selectedChapter, apiCacheKey, isApiVersion]);
 
   function changeVersion(versionId) {
     setSelectedVersion(versionId);
