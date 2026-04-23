@@ -1,0 +1,27 @@
+# Dependências
+node_modules/
+functions/node_modules/
+
+# Build
+build/
+functions/lib/
+
+# Variáveis de ambiente (nunca commitar)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+firebase-debug.log
+.firebase/
+
+# Android build artifacts
+android/app/build/
+android/.gradle/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
