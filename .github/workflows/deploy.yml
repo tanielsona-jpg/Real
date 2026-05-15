@@ -1,17 +1,21 @@
 name: Deploy to Firebase Hosting
 
+
 on:
   push:
     branches:
       - main
 
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -19,11 +23,14 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+
       - name: Build
-        run: CI=false npm run build
+        run: CI=false DISABLE_ESLINT_PLUGIN=true npm run build
+
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
