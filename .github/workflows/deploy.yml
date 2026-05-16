@@ -1,5 +1,6 @@
 name: Deploy to Firebase Hosting
 
+# Trigger deploy on push to main
 
 on:
   push:
