@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 const SUPABASE_URL = "https://iofgweifqpnrznfmdfug.supabase.co/functions/v1/canela-de-fogo";
+const SUPABASE_ANON_KEY = "sb_publishable_eU5BzfMIMWq1C-k0TzMg8Q_jukclDWP";
 
 export default function CanelaDeFogo({ livro, capitulo, textoCapitulo }) {
   const [aberto, setAberto] = useState(false);
@@ -26,7 +27,11 @@ export default function CanelaDeFogo({ livro, capitulo, textoCapitulo }) {
     try {
       const res = await fetch(SUPABASE_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+          "apikey": SUPABASE_ANON_KEY,
+        },
         body: JSON.stringify({ pergunta: p, livro, capitulo, textoCapitulo }),
       });
       const data = await res.json();
