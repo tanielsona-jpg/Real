@@ -1,69 +1,54 @@
-// functions/index.js
-// ─────────────────────────────────────────────────────────────────
-// Cloud Function: canelaDeFogo
-//
-// Recebe do app: { pergunta, livro, capitulo, textoCapitulo }
-// Chama a API da IA com um system prompt fixo
-// Retorna: { resposta }
-//
-// Deploy:
-//   firebase functions:secrets:set ANTHROPIC_KEY
-//   firebase deploy --only functions
-// ─────────────────────────────────────────────────────────────────
-
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { defineSecret }       = require("firebase-functions/params");
-const Anthropic               = require("@anthropic-ai/sdk");
+const { defineSecret } = require("firebase-functions/params");
+const OpenAI = require("openai");
 
-const ANTHROPIC_KEY = defineSecret("ANTHROPIC_KEY");
+const OPENAI_KEY = defineSecret("OPENAI_KEY");
 
 exports.canelaDeFogo = onCall(
-  { secrets: [ANTHROPIC_KEY], region: "us-central1" },
+  { secrets: [OPENAI_KEY], region: "us-central1" },
   async (request) => {
 
     const { pergunta, livro, capitulo, textoCapitulo } = request.data;
 
-    // Validação básica
     if (!pergunta || typeof pergunta !== "string" || pergunta.trim().length === 0) {
-      throw new HttpsError("invalid-argument", "A pergunta não pode estar vazia.");
+      throw new HttpsError("invalid-argument", "A pergunta nao pode estar vazia.");
     }
     if (pergunta.length > 800) {
       throw new HttpsError("invalid-argument", "Pergunta muito longa.");
     }
 
-    const client = new Anthropic({ apiKey: ANTHROPIC_KEY.value() });
+    const client = new OpenAI({ apiKey: OPENAI_KEY.value() });
 
-    const systemPrompt = `Você é a Canela de Fogo ❤️‍🔥, assistente de estudos bíblicos da Família Azevedo.
-
+    const systemPrompt = `Voce e a Canela de Fogo, assistente de estudos biblicos da Familia Azevedo.
 Personalidade:
-- Voz encorajadora, profunda e cheia de fé
+- Voz encorajadora, profunda e cheia de fe
 - Respostas calorosas e inspiradoras, mas sempre fundamentadas no texto
-- Usa linguagem acessível, com profundidade espiritual
-- Pode incluir perguntas reflexivas para estimular meditação
-
+- Usa linguagem acessivel, com profundidade espiritual
+- Pode incluir perguntas reflexivas para estimular meditacao
 Regras importantes:
-- Responda APENAS perguntas relacionadas ao texto bíblico fornecido abaixo
-- Se a pergunta for fora do escopo do capítulo, redirecione gentilmente: "Boa pergunta! Mas vamos nos concentrar em ${livro} ${capitulo} por agora..."
+- Responda APENAS perguntas relacionadas ao texto biblico fornecido abaixo
+- Se a pergunta for fora do escopo do capitulo, redirecione gentilmente
 - Seja conciso: respostas entre 3 e 8 linhas
-- Não cite versículos fora deste capítulo sem avisar que está expandindo o contexto
-
-Texto atual — ${livro}, capítulo ${capitulo}:
-${textoCapitulo || "(texto não disponível)"}`;
+- Nao cite versiculos fora deste capitulo sem avisar que esta expandindo o contexto
+Texto atual - ${livro}, capitulo ${capitulo}:
+${textoCapitulo || "(texto nao disponivel)"}`;
 
     try {
-      const response = await client.messages.create({
-        model:      "claude-opus-4-6",
+      const response = await client.chat.completions.create({
+        model: "gpt-4o-mini",
         max_tokens: 600,
-        system:     systemPrompt,
-        messages:   [{ role: "user", content: pergunta.trim() }],
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: pergunta.trim() },
+        ],
       });
 
-      const resposta = response.content[0]?.text || "Não consegui gerar uma resposta agora.";
+      const resposta = response.choices[0]?.message?.content || "Nao consegui gerar uma resposta.";
       return { resposta };
 
     } catch (err) {
-      console.error("Erro na API da IA:", err);
-      throw new HttpsError("internal", "Erro ao consultar a IA. Tente novamente.");
+      console.error("Erro OpenAI:", err);
+      throw new HttpsError("internal", "Erro ao chamar a IA.");
     }
   }
 );
