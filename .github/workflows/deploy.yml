@@ -1,22 +1,17 @@
-name: Deploy to Firebase Hosting
-
-# Trigger deploy on push to main
+name: Deploy to Firebase
 
 on:
   push:
     branches:
       - main
 
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -24,16 +19,16 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-
-      - name: Install dependencies
+      - name: Install web app dependencies
         run: npm install --legacy-peer-deps
 
-
-      - name: Build
+      - name: Build web app
         run: CI=false DISABLE_ESLINT_PLUGIN=true npm run build
 
+      - name: Install functions dependencies
+        run: cd functions && npm install
 
-      - name: Deploy to Firebase Hosting
+      - name: Deploy Hosting and Functions to Firebase
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
